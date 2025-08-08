@@ -1,0 +1,28 @@
+# Default configuration for Meeting Recorder CLI options
+output_dir: ~/Recordings/Meetings
+format: wav
+bitrate: 192k
+segment_duration: 300
+name: null
+system_only: false
+mic_only: false
+source_system: null
+source_mic: null
+post_process: false
+enable_automation: false
+whisper_path: ~/projects/whisper.cpp/build/bin/whisper-cli
+whisper_model: ~/projects/whisper.cpp/models/ggml-base.bin
+whisper_language: auto
+whisper_threads: 4
+ollama_url: http://coruscant.rxnet:11434
+ollama_model: gemma3:12b
+ollama_prompt_initial: |
+  This is the first segment of a meeting recording. Please summarize the following transcript:
+ollama_prompt_continuation: |
+  This is a continuation of a meeting. Previous summary:
+  {rolling_summary}
+  New transcript:
+  {transcript}
+  Please update the summary.
+ollama_system_prompt: |
+  You are a helpful, concise meeting assistant. Your job is to summarize meeting segments, track context, and update the summary incrementally. Focus on clarity, action items, and key decisions. Do not hallucinate or invent content. Always use the transcript as your only source.

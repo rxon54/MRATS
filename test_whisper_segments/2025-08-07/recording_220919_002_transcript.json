@@ -1,0 +1,98 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,880"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4880
+			},
+			"text": " roads while everybody figures it out, but obviously there's tons of stuff where it's going to make"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,880",
+				"to": "00:00:10,000"
+			},
+			"offsets": {
+				"from": 4880,
+				"to": 10000
+			},
+			"text": " everything so much easier for reading long documents for summarizing stuff, right? Some order comes"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,000",
+				"to": "00:00:15,280"
+			},
+			"offsets": {
+				"from": 10000,
+				"to": 15280
+			},
+			"text": " out, right? Instead of reading it, you're like, \"Hey, ChatGPT, what are the top five bullet points?\""
+		},
+		{
+			"timestamps": {
+				"from": "00:00:15,280",
+				"to": "00:00:21,200"
+			},
+			"offsets": {
+				"from": 15280,
+				"to": 21200
+			},
+			"text": " It's like here, you know? Yeah, I mean, even at some local level DMV where things are really kind"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:21,200",
+				"to": "00:00:25,440"
+			},
+			"offsets": {
+				"from": 21200,
+				"to": 25440
+			},
+			"text": " of rough around the edges and not working well, you'd think it might make some impact. I think"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:25,440",
+				"to": "00:00:30,000"
+			},
+			"offsets": {
+				"from": 25440,
+				"to": 30000
+			},
+			"text": " I think someone there might say, hey, I can save some time by putting this into Chagy."
+		}
+	]
+}

@@ -1,0 +1,1 @@
+**Summary:** The team is discussing a new research model. Benchmarks are considered exciting, but are reaching a saturation point. To demonstrate the model's real-world application and usefulness, Adi and Brian will now present it.

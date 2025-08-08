@@ -1,0 +1,98 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,120"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4120
+			},
+			"text": " - What's been happening, I apologize if I'm I'm trying"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,120",
+				"to": "00:00:07,160"
+			},
+			"offsets": {
+				"from": 4120,
+				"to": 7160
+			},
+			"text": " to reach out, but also I'm trying to talk and do this."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,160",
+				"to": "00:00:08,000"
+			},
+			"offsets": {
+				"from": 7160,
+				"to": 8000
+			},
+			"text": " - That's one part."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,000",
+				"to": "00:00:08,840"
+			},
+			"offsets": {
+				"from": 8000,
+				"to": 8840
+			},
+			"text": " - I'll help you with that."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,840",
+				"to": "00:00:09,680"
+			},
+			"offsets": {
+				"from": 8840,
+				"to": 9680
+			},
+			"text": " - Let me go over to the chat."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,680",
+				"to": "00:00:10,520"
+			},
+			"offsets": {
+				"from": 9680,
+				"to": 10520
+			},
+			"text": " - Oh yeah."
+		}
+	]
+}

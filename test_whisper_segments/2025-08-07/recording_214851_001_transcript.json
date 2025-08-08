@@ -1,0 +1,87 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:03,040"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 3040
+			},
+			"text": " - Hey, Cole, welcome to chat."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:03,040",
+				"to": "00:00:04,920"
+			},
+			"offsets": {
+				"from": 3040,
+				"to": 4920
+			},
+			"text": " Cole, Trigasky's got it."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,920",
+				"to": "00:00:05,840"
+			},
+			"offsets": {
+				"from": 4920,
+				"to": 5840
+			},
+			"text": " Okay, very cool."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,840",
+				"to": "00:00:08,040"
+			},
+			"offsets": {
+				"from": 5840,
+				"to": 8040
+			},
+			"text": " Cole, what's your impression so far?"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,040",
+				"to": "00:00:08,880"
+			},
+			"offsets": {
+				"from": 8040,
+				"to": 8880
+			},
+			"text": " Cole."
+		}
+	]
+}

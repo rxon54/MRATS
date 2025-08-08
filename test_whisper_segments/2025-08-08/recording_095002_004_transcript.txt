@@ -1,0 +1,5 @@
+ So last month, I was on a different livestream and towards the end, I ran into a bug that I covered up.
+ And afterwards, I tried to have GPT-5 or I tried to have GPT-03 fix it for me and it couldn't.
+ So while we were testing GP5 before this, I had it see if it could fix that bug for me.
+ And to taunt the demo gods, I'm going to see if it can do it on stage.
+ All right, let's hope for better luck and with 03 this is less about that fix and more about the behavior of the model

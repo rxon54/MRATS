@@ -1,0 +1,109 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:04,560"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 4560
+			},
+			"text": " 99% in some benchmark, it means you need something else to really capture how great the model is."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,560",
+				"to": "00:00:08,640"
+			},
+			"offsets": {
+				"from": 4560,
+				"to": 8640
+			},
+			"text": " And one thing we've done very differently with this model is really focused on not just"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,640",
+				"to": "00:00:13,920"
+			},
+			"offsets": {
+				"from": 8640,
+				"to": 13920
+			},
+			"text": " these numbers, but really on real-world application. It being really useful to you in your daily workflow."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:13,920",
+				"to": "00:00:19,680"
+			},
+			"offsets": {
+				"from": 13920,
+				"to": 19680
+			},
+			"text": " So, hearing about it is much less exciting than seeing it. So to show you this model in action,"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:19,680",
+				"to": "00:00:22,480"
+			},
+			"offsets": {
+				"from": 19680,
+				"to": 22480
+			},
+			"text": " I'd like to welcome Adi and Brian to the stage."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:22,480",
+				"to": "00:00:29,520"
+			},
+			"offsets": {
+				"from": 22480,
+				"to": 29520
+			},
+			"text": " Thanks, Greg. I'm Brian, a solutions architect on the startup"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:29,520",
+				"to": "00:00:30,020"
+			},
+			"offsets": {
+				"from": 29520,
+				"to": 30020
+			},
+			"text": " see you."
+		}
+	]
+}

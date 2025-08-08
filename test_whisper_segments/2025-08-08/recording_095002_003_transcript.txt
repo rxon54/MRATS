@@ -1,0 +1,9 @@
+ I'm Adi, a researcher on the post training team.
+ To recreate the ideal pair programmer,
+ you need a model that understands
+ best software engineering practices,
+ but has a personality that just feels right to work with.
+ For GPT-5, we worked really hard to make the model
+ pair perfectly with you by default out of the box.
+ Let me pull up a demo of GPT-5 inside of cursor
+ to show you this behavior that we taught it.

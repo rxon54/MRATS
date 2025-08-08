@@ -1,0 +1,11 @@
+{
+  "start_time": "2025-08-07T21:37:42.857152",
+  "segment_index": "011",
+  "sources": {
+    "system": null,
+    "mic": null,
+    "combined": false
+  },
+  "format": "wav",
+  "bitrate": "192k"
+}

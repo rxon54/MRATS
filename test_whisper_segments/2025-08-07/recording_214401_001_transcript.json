@@ -1,0 +1,65 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:05,360"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 5360
+			},
+			"text": " a lot of data. Like if you take an agent and you throw him into some crazy world and he"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,360",
+				"to": "00:00:09,200"
+			},
+			"offsets": {
+				"from": 5360,
+				"to": 9200
+			},
+			"text": " starts figuring stuff out, you're like, okay, that's good. And if he does something"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:09,200",
+				"to": "00:00:09,920"
+			},
+			"offsets": {
+				"from": 9200,
+				"to": 9920
+			},
+			"text": " horrible."
+		}
+	]
+}

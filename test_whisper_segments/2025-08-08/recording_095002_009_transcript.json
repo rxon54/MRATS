@@ -1,0 +1,197 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:02,680"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 2680
+			},
+			"text": " Tested it out and it ran the first time."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:02,680",
+				"to": "00:00:04,240"
+			},
+			"offsets": {
+				"from": 2680,
+				"to": 4240
+			},
+			"text": " It was pretty surprising."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:04,240",
+				"to": "00:00:05,080"
+			},
+			"offsets": {
+				"from": 4240,
+				"to": 5080
+			},
+			"text": " - That's incredible."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:05,080",
+				"to": "00:00:06,280"
+			},
+			"offsets": {
+				"from": 5080,
+				"to": 6280
+			},
+			"text": " - That is magical."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:06,280",
+				"to": "00:00:07,680"
+			},
+			"offsets": {
+				"from": 6280,
+				"to": 7680
+			},
+			"text": " - Okay, so it made the edits."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:07,680",
+				"to": "00:00:10,880"
+			},
+			"offsets": {
+				"from": 7680,
+				"to": 10880
+			},
+			"text": " It looks like, yeah, it found the right problem."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:10,880",
+				"to": "00:00:14,920"
+			},
+			"offsets": {
+				"from": 10880,
+				"to": 14920
+			},
+			"text": " And right now it's actually, okay, it's running lints,"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,920",
+				"to": "00:00:17,640"
+			},
+			"offsets": {
+				"from": 14920,
+				"to": 17640
+			},
+			"text": " but these lints are actually not related to this bug,"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:17,640",
+				"to": "00:00:19,040"
+			},
+			"offsets": {
+				"from": 17640,
+				"to": 19040
+			},
+			"text": " so it's going to ignore them."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:19,040",
+				"to": "00:00:21,880"
+			},
+			"offsets": {
+				"from": 19040,
+				"to": 21880
+			},
+			"text": " And then it's going to run a build."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:21,880",
+				"to": "00:00:24,080"
+			},
+			"offsets": {
+				"from": 21880,
+				"to": 24080
+			},
+			"text": " It'll run tests if there are any."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:24,080",
+				"to": "00:00:25,720"
+			},
+			"offsets": {
+				"from": 24080,
+				"to": 25720
+			},
+			"text": " It's gonna make sure that this code"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:25,720",
+				"to": "00:00:27,600"
+			},
+			"offsets": {
+				"from": 25720,
+				"to": 27600
+			},
+			"text": " is shipable before it's done."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:27,600",
+				"to": "00:00:28,560"
+			},
+			"offsets": {
+				"from": 27600,
+				"to": 28560
+			},
+			"text": " - It's actually really smart"
+		},
+		{
+			"timestamps": {
+				"from": "00:00:28,560",
+				"to": "00:00:29,960"
+			},
+			"offsets": {
+				"from": 28560,
+				"to": 29960
+			},
+			"text": " that it finds slence and realized."
+		}
+	]
+}

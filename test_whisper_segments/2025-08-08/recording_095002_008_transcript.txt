@@ -1,0 +1,14 @@
+ going and seeing how this model behaves in practice,
+ figuring out what people really want
+ and putting that back into model training.
+ That's something that I think has been like a real focus
+ for this model.
+ - It's been pretty great.
+ So while this is fixing,
+ the other thing that we did during testing
+ which was really surprising was we were sort of fresh for time.
+ And we had it refactor one of our test harnesses
+ to run parallel on Docker
+ and set it off, came back like 45 minutes later,
+ it's just like it just finished
+ And we do.

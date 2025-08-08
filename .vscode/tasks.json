@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "Test Meeting Recorder with Whisper.cpp debug logging",
+			"command": "python3 meeting_recorder.py --start --enable-automation --segment-duration 10 --output-dir ./test_whisper_segments --system-only",
+			"args": [],
+			"isBackground": false
+		}
+	]
+}

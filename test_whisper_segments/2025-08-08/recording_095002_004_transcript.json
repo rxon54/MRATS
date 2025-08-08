@@ -1,0 +1,87 @@
+{
+	"systeminfo": "WHISPER : COREML = 0 | OPENVINO = 0 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | OPENMP = 1 | REPACK = 1 | ",
+	"model": {
+		"type": "base",
+		"multilingual": true,
+		"vocab": 51865,
+		"audio": {
+			"ctx": 1500,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"text": {
+			"ctx": 448,
+			"state": 512,
+			"head": 8,
+			"layer": 6
+		},
+		"mels": 80,
+		"ftype": 1
+	},
+	"params": {
+		"model": "/home/rxon/projects/whisper.cpp/models/ggml-base.bin",
+		"language": "auto",
+		"translate": false
+	},
+	"result": {
+		"language": "en"
+	},
+	"transcription": [
+		{
+			"timestamps": {
+				"from": "00:00:00,000",
+				"to": "00:00:08,000"
+			},
+			"offsets": {
+				"from": 0,
+				"to": 8000
+			},
+			"text": " So last month, I was on a different livestream and towards the end, I ran into a bug that I covered up."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:08,000",
+				"to": "00:00:14,000"
+			},
+			"offsets": {
+				"from": 8000,
+				"to": 14000
+			},
+			"text": " And afterwards, I tried to have GPT-5 or I tried to have GPT-03 fix it for me and it couldn't."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:14,000",
+				"to": "00:00:21,000"
+			},
+			"offsets": {
+				"from": 14000,
+				"to": 21000
+			},
+			"text": " So while we were testing GP5 before this, I had it see if it could fix that bug for me."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:21,000",
+				"to": "00:00:25,000"
+			},
+			"offsets": {
+				"from": 21000,
+				"to": 25000
+			},
+			"text": " And to taunt the demo gods, I'm going to see if it can do it on stage."
+		},
+		{
+			"timestamps": {
+				"from": "00:00:25,000",
+				"to": "00:00:29,960"
+			},
+			"offsets": {
+				"from": 25000,
+				"to": 29960
+			},
+			"text": " All right, let's hope for better luck and with 03 this is less about that fix and more about the behavior of the model"
+		}
+	]
+}
