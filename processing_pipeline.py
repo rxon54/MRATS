@@ -5,6 +5,7 @@ import subprocess
 import json
 import os
 import requests
+from datetime import datetime, timezone
 
 class ProcessingPipeline:
     """Orchestrates the automated workflow: segmentation → transcription → summarization → output"""
@@ -22,6 +23,22 @@ class ProcessingPipeline:
         self.ollama_model = ollama_model
         self.system_prompt = system_prompt or ""
         self.last_summary = None  # For rolling summary
+        # Metrics / instrumentation (Phase 1)
+        self.metrics_enabled = False
+        self.metrics_dir_name = "metrics"
+        self.metrics_file_path = None
+        self._processed_count = 0
+        self._ema_latency = None  # exponential moving average of total latency
+        self._ema_alpha = 0.2
+        self.session_dir = None
+
+    def set_session_dir(self, session_dir):
+        """Set session directory (called by recorder) and prepare metrics path if enabled."""
+        self.session_dir = session_dir
+        if self.metrics_enabled and self.session_dir:
+            metrics_dir = os.path.join(self.session_dir, self.metrics_dir_name)
+            os.makedirs(metrics_dir, exist_ok=True)
+            self.metrics_file_path = os.path.join(metrics_dir, 'metrics.ndjson')
 
     def start(self):
         if not self.automation_enabled or self.running:
@@ -36,34 +53,109 @@ class ProcessingPipeline:
             self.worker_thread.join(timeout=5)
 
     def enqueue_segment(self, segment_path, metadata):
+        # Store enqueue time for wait measurement
+        metadata = dict(metadata)  # shallow copy to avoid mutation side effects
+        metadata['enqueue_time_monotonic'] = time.monotonic()
         self.segment_queue.put((segment_path, metadata))
+
+    def drain(self, poll_interval=1.0):
+        """Block until the segment queue is empty and worker is idle."""
+        print("[Pipeline] Draining: waiting for all queued segments to finish processing...")
+        while self.running and (not self.segment_queue.empty() or not self.is_idle()):
+            print(f"[Pipeline] Segments remaining: {self.segment_queue.qsize()} (worker busy: {not self.is_idle()})")
+            time.sleep(poll_interval)
+        print("[Pipeline] Drain complete.")
+
+    def is_idle(self):
+        # Returns True if worker is not processing a segment (i.e., between tasks)
+        # We use a flag set at the start/end of process_segment
+        return not getattr(self, '_worker_busy', False)
 
     def _worker(self):
         while self.running:
             try:
                 segment_path, metadata = self.segment_queue.get(timeout=2)
-                self.process_segment(segment_path, metadata)
+                start_monotonic = time.monotonic()
+                wait_s = start_monotonic - metadata.get('enqueue_time_monotonic', start_monotonic)
+                segment_index = metadata.get('segment_index')
+                total_start = start_monotonic
+                print(f"[Pipeline] Processing segment: {segment_path} (wait {wait_s:.2f}s, queue size after get {self.segment_queue.qsize()})")
+                # Transcription timing
+                t_tx_start = time.monotonic()
+                transcript = self.transcribe(segment_path, metadata)
+                t_tx_end = time.monotonic()
+                transcription_time = t_tx_end - t_tx_start
+                # Summarization timing
+                t_sum_start = time.monotonic()
+                summary = self.summarize(transcript, metadata)
+                t_sum_end = time.monotonic()
+                summarization_time = t_sum_end - t_sum_start
+                total_latency = t_sum_end - total_start
+                # Update EMA
+                if self._ema_latency is None:
+                    self._ema_latency = total_latency
+                else:
+                    self._ema_latency = self._ema_alpha * total_latency + (1 - self._ema_alpha) * self._ema_latency
+                self._processed_count += 1
+                # Metrics line
+                if self.metrics_enabled:
+                    self._write_metrics_line({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "type": "segment",
+                        "segment_index": segment_index,
+                        "transcription": {
+                            "wait_s": round(wait_s, 4),
+                            "process_s": round(transcription_time, 4)
+                        },
+                        "summarization": {
+                            "wait_s": 0.0,
+                            "process_s": round(summarization_time, 4)
+                        },
+                        "total_latency_s": round(total_latency, 4),
+                        "ema_latency_s": round(self._ema_latency, 4),
+                        "backlog_sizes": {
+                            "segment_queue": self.segment_queue.qsize()
+                        },
+                        "chars_transcript": len(transcript) if transcript else 0,
+                        "chars_summary": len(summary) if summary else 0,
+                        "processed_count": self._processed_count
+                    })
+                self.save_outputs(segment_path, transcript, summary, metadata)
             except queue.Empty:
                 continue
+            except Exception as e:
+                print(f"[Pipeline][ERROR] Worker exception: {e}")
 
     def process_segment(self, segment_path, metadata):
-        print(f"[Pipeline] Processing segment: {segment_path}")
-        # Step 1: Transcription (stub)
-        transcript = self.transcribe(segment_path, metadata)
-        # Step 2: Summarization (stub)
-        summary = self.summarize(transcript, metadata)
-        # Step 3: Output (stub)
-        self.save_outputs(segment_path, transcript, summary, metadata)
+        self._worker_busy = True
+        try:
+            print(f"[Pipeline] Processing segment: {segment_path}")
+            transcript = self.transcribe(segment_path, metadata)
+            summary = self.summarize(transcript, metadata)
+            self.save_outputs(segment_path, transcript, summary, metadata)
+        finally:
+            self._worker_busy = False
+
+    def _derive_session_dirs(self, segment_path):
+        """Given a segment path .../session/segments/segment_000.wav, return base session dirs."""
+        abs_seg = os.path.abspath(segment_path)
+        segments_dir = os.path.dirname(abs_seg)
+        session_dir = os.path.dirname(segments_dir)
+        transcription_dir = os.path.join(session_dir, 'transcription')
+        summaries_dir = os.path.join(session_dir, 'summaries')
+        return session_dir, segments_dir, transcription_dir, summaries_dir
 
     def transcribe(self, segment_path, metadata):
         print(f"[Pipeline] Transcribing {segment_path} with Whisper.cpp ...")
+        segment_path_abs = os.path.abspath(segment_path)
+        session_dir, segments_dir, transcription_dir, summaries_dir = self._derive_session_dirs(segment_path_abs)
+        os.makedirs(transcription_dir, exist_ok=True)
+        base_segment_name = os.path.splitext(os.path.basename(segment_path_abs))[0]  # segment_000
+        transcript_base = os.path.join(transcription_dir, base_segment_name + '_transcript')
+        transcript_txt_path = transcript_base + '.txt'
+        transcript_json_path = transcript_base + '.json'
         transcript_txt = ""
         transcript_json = None
-        # Use absolute paths for all files
-        abs_segment_path = os.path.abspath(segment_path)
-        transcript_base = abs_segment_path.replace('.wav', '_transcript')
-        transcript_path = transcript_base + '.txt'
-        transcript_json_path = transcript_base + '.json'
         abs_model_path = os.path.expanduser(self.whisper_model)
         abs_whisper_path = os.path.expanduser(self.whisper_path)
         cmd = [
@@ -73,55 +165,40 @@ class ProcessingPipeline:
             "-of", transcript_base,
             "-l", self.whisper_language,
             "-t", str(self.whisper_threads),
-            "-f", abs_segment_path
+            "-f", segment_path_abs
         ]
         print(f"[Pipeline][DEBUG] Whisper.cpp command: {' '.join(cmd)}")
-        print(f"[Pipeline][DEBUG] Working dir: {os.getcwd()}")
-        print(f"[Pipeline][DEBUG] WAV exists: {os.path.exists(abs_segment_path)} | Size: {os.path.getsize(abs_segment_path) if os.path.exists(abs_segment_path) else 0}")
-        print(f"[Pipeline][DEBUG] Model exists: {os.path.exists(abs_model_path)}")
         max_retries = 2
         for attempt in range(max_retries):
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=os.environ.copy())
-                print(f"[Pipeline][DEBUG] Whisper.cpp stdout: {result.stdout}")
                 print(f"[Pipeline][DEBUG] Whisper.cpp stderr: {result.stderr}")
-                print(f"[Pipeline][DEBUG] Return code: {result.returncode}")
                 if result.returncode != 0:
                     print(f"[Pipeline] Whisper.cpp failed (attempt {attempt+1}): {result.stderr}")
                     time.sleep(2 ** attempt)
                     continue
-                # Wait for transcript JSON to be stable
                 if os.path.exists(transcript_json_path):
                     if not self.wait_for_file_stable(transcript_json_path, min_size=32, stable_time=0.5, timeout=10):
                         print(f"[Pipeline][WARN] Transcript JSON not stable: {transcript_json_path}")
                         continue
-                    print(f"[Pipeline][DEBUG] Found transcript JSON: {transcript_json_path}")
                     with open(transcript_json_path, 'r') as f:
                         transcript_json = json.load(f)
-                    # Robustly extract transcript text
                     segments = []
                     if isinstance(transcript_json, dict):
                         if 'transcription' in transcript_json:
                             segments = transcript_json['transcription']
-                            print(f"[Pipeline][DEBUG] Using 'transcription' key from transcript JSON.")
                         elif 'segments' in transcript_json:
                             segments = transcript_json['segments']
-                            print(f"[Pipeline][DEBUG] Using 'segments' key from transcript JSON.")
-                        else:
-                            print(f"[Pipeline][ERROR] No 'transcription' or 'segments' key in transcript JSON dict.")
                     elif isinstance(transcript_json, list):
                         segments = transcript_json
-                        print(f"[Pipeline][DEBUG] Using top-level list from transcript JSON.")
-                    else:
-                        print(f"[Pipeline][ERROR] Unexpected transcript JSON structure: {type(transcript_json)}")
-                    print(f"[Pipeline][DEBUG] Extracted {len(segments)} segments from transcript JSON.")
                     transcript_txt = '\n'.join([seg.get('text', '') for seg in segments if 'text' in seg])
                     if transcript_txt.strip():
-                        with open(transcript_path, 'w') as f:
-                            f.write(transcript_txt)
-                        print(f"[Pipeline] Transcript saved: {transcript_path}")
-                    else:
-                        print(f"[Pipeline][WARN] No transcript text extracted; .txt not written.")
+                        try:
+                            with open(transcript_txt_path, 'w') as f:
+                                f.write(transcript_txt)
+                            print(f"[Pipeline] Transcript saved: {transcript_txt_path}")
+                        except Exception as e:
+                            print(f"[Pipeline][ERROR] Could not write transcript txt: {e}")
                     return transcript_txt
                 else:
                     print(f"[Pipeline][DEBUG] Whisper.cpp did not produce output file: {transcript_json_path}")
@@ -136,47 +213,30 @@ class ProcessingPipeline:
         if not transcript.strip():
             print("[Pipeline][WARN] Empty transcript, skipping summarization.")
             return ""
-        # Prompt engineering
         if not self.last_summary:
             user_prompt = f"This is the first segment of a meeting recording. Please summarize the following transcript:\n{transcript}"
         else:
             user_prompt = f"This is a continuation of a meeting. Previous summary:\n{self.last_summary}\nNew transcript:\n{transcript}\nPlease update the summary."
-        # Prepend system prompt if set
         prompt = self.system_prompt.strip() + "\n\n" + user_prompt if self.system_prompt else user_prompt
-        data = {
-            "model": self.ollama_model,
-            "prompt": prompt,
-            "stream": False
-        }
+        data = {"model": self.ollama_model, "prompt": prompt, "stream": False}
         try:
-            response = requests.post(f"{self.ollama_url}/api/generate", json=data, timeout=60)
+            response = requests.post(f"{self.ollama_url}/api/generate", json=data, timeout=300)
             response.raise_for_status()
             summary = response.json().get("response", "")
-            print(f"[Pipeline] Ollama summary: {summary[:120]}...")
             self.last_summary = summary
-            # Save segment summary
-            segment_path = metadata.get('segment_path') or metadata.get('path') or metadata.get('file') or ''
-            if not segment_path:
-                print(f"[Pipeline][WARN] No segment_path in metadata, using transcript[:16] as fallback.")
-                segment_base = transcript[:16].replace(' ', '_')
-                summary_path = os.path.join(os.getcwd(), f"{segment_base}_summary.md")
-            else:
-                segment_base = os.path.abspath(segment_path).replace('.wav', '')
-                summary_path = segment_base + '_summary.md'
-            summary_dir = os.path.dirname(summary_path)
-            if not os.path.isdir(summary_dir):
-                try:
-                    os.makedirs(summary_dir, exist_ok=True)
-                except Exception as e:
-                    print(f"[Pipeline][ERROR] Could not create summary directory {summary_dir}: {e}")
+            # Determine output directories
+            segment_path = metadata.get('segment_path', '')
+            session_dir, segments_dir, transcription_dir, summaries_dir = self._derive_session_dirs(segment_path)
+            os.makedirs(summaries_dir, exist_ok=True)
+            base_segment_name = os.path.splitext(os.path.basename(segment_path))[0]
+            summary_path = os.path.join(summaries_dir, base_segment_name + '_summary.md')
             try:
                 with open(summary_path, 'w') as f:
                     f.write(summary)
                 print(f"[Pipeline] Summary saved: {summary_path}")
             except Exception as e:
                 print(f"[Pipeline][ERROR] Could not write summary file {summary_path}: {e}")
-            # Save/update rolling summary
-            rolling_path = os.path.join(summary_dir, 'rolling_summary.md')
+            rolling_path = os.path.join(summaries_dir, 'rolling_summary.md')
             try:
                 with open(rolling_path, 'w') as f:
                     f.write(self.last_summary)
@@ -187,14 +247,20 @@ class ProcessingPipeline:
             print(f"[Pipeline][ERROR] Ollama summarization failed: {e}")
             return ""
 
+    def _write_metrics_line(self, data: dict):
+        if not self.metrics_file_path:
+            return
+        try:
+            with open(self.metrics_file_path, 'a') as f:
+                f.write(json.dumps(data) + '\n')
+        except Exception as e:
+            print(f"[Pipeline][WARN] Failed to write metrics line: {e}")
+
     def save_outputs(self, segment_path, transcript, summary, metadata):
-        print(f"[Pipeline] (Stub) Saving outputs for {segment_path}")
-        # TODO: Implement output management in later step
-        # For now, just print
-        print(f"Transcript: {transcript}\nSummary: {summary}")
+        # Placeholder for any additional aggregation logic
+        pass
 
     def wait_for_file_stable(self, path, min_size=32, stable_time=0.5, timeout=10):
-        """Wait until file exists, is non-empty, and size is stable for stable_time seconds."""
         import time
         start = time.time()
         last_size = -1

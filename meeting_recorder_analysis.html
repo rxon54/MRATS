@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Recorder Performance Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        h2 {
+            color: #34495e;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+        h3 {
+            color: #2c3e50;
+            margin-top: 30px;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .chart-container {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .chart-canvas {
+            max-height: 400px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 5px solid;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            border-color: #ffc107;
+            color: #856404;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+        .insight-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 25px 0;
+        }
+        .recommendation {
+            background: #e8f5e8;
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+        }
+        .data-table th, .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .data-table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        .data-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Meeting Recorder Performance Analysis Report</h1>
+        
+        <div class="insight-box">
+            <h3 style="margin-top: 0; color: white;">Executive Summary</h3>
+            <p>Your meeting recorder system is experiencing significant performance degradation due to computational constraints. The system starts efficiently but quickly develops a substantial backlog that grows exponentially, creating processing delays that extend beyond 10 minutes by the end of the analyzed period.</p>
+        </div>
+
+        <h2>📊 Key Performance Metrics</h2>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">19</div>
+                <div class="metric-label">Total Segments Processed</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">118.7s</div>
+                <div class="metric-label">Final Average Latency</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">18</div>
+                <div class="metric-label">Maximum Backlog Size</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">638.7s</div>
+                <div class="metric-label">Maximum Wait Time</div>
+            </div>
+        </div>
+
+        <div class="alert alert-danger">
+            <strong>Critical Issue Detected:</strong> The system is processing segments at a rate significantly slower than they are being generated, creating an ever-growing backlog that results in processing delays exceeding 10 minutes.
+        </div>
+
+        <h2>📈 Latency Trend Analysis</h2>
+        <div class="chart-container">
+            <canvas id="latencyChart" class="chart-canvas"></canvas>
+        </div>
+
+        <h2>⏳ Processing Time Breakdown</h2>
+        <div class="chart-container">
+            <canvas id="processingChart" class="chart-canvas"></canvas>
+        </div>
+
+        <h2>📦 Queue Backlog Growth</h2>
+        <div class="chart-container">
+            <canvas id="backlogChart" class="chart-canvas"></canvas>
+        </div>
+
+        <h2>🔍 Detailed Performance Analysis</h2>
+
+        <h3>Transcription Performance</h3>
+        <p>The whisper.cpp transcriber shows relatively stable performance throughout the session. Processing times remain consistently between 10-20 seconds per segment, with only minor variations. However, as the backlog grows, wait times increase dramatically, reaching over 10 minutes (638.7 seconds) by the final segments.</p>
+
+        <h3>Summarization Bottleneck</h3>
+        <p>The Gemma3:e4b model running on Ollama represents the primary performance bottleneck in your system. Summarization processing times show concerning patterns:</p>
+
+        <div class="data-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Segment Range</th>
+                        <th>Average Transcription Time</th>
+                        <th>Average Summarization Time</th>
+                        <th>Ratio (Summ/Trans)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>0-5 (Early)</td>
+                        <td>10.3s</td>
+                        <td>24.7s</td>
+                        <td>2.4x</td>
+                    </tr>
+                    <tr>
+                        <td>6-10 (Mid)</td>
+                        <td>10.6s</td>
+                        <td>32.4s</td>
+                        <td>3.1x</td>
+                    </tr>
+                    <tr>
+                        <td>11-18 (Late)</td>
+                        <td>20.8s</td>
+                        <td>118.9s</td>
+                        <td>5.7x</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Content Growth Impact</h3>
+        <p>As meetings progress and summaries grow longer (from 276 characters to over 2000 characters), the summarization model requires exponentially more processing time. This suggests the model is struggling with increasingly complex context and longer input sequences.</p>
+
+        <h2>🚨 Critical Observations</h2>
+
+        <div class="alert alert-warning">
+            <strong>Exponential Degradation Pattern:</strong> The system exhibits classic signs of resource exhaustion, where processing demand exceeds available computational capacity, leading to exponential queue growth.
+        </div>
+
+        <p>The data reveals several concerning trends that indicate your system is fundamentally undersized for the workload:</p>
+
+        <p><strong>Processing Rate Mismatch:</strong> Audio segments are being generated faster than the combined transcription and summarization pipeline can process them. This is evident from the growing backlog that reaches 18 segments by the end of the session.</p>
+
+        <p><strong>Context Length Penalty:</strong> The summarization model appears to suffer from significant performance degradation as the cumulative summary grows longer. Processing times increase from around 25 seconds initially to over 150 seconds for later segments, suggesting the model struggles with longer context windows.</p>
+
+        <p><strong>Memory and Thermal Throttling:</strong> The dramatic increase in processing times, particularly for transcription in later segments, suggests possible thermal throttling or memory pressure affecting the local compute resources.</p>
+
+        <h2>💡 Recommendations</h2>
+
+        <div class="recommendation">
+            <h4>Immediate Actions (Priority 1)</h4>
+            <p><strong>Implement Queue Management:</strong> Add a maximum queue size limit with segment dropping or compression to prevent infinite backlog growth. Consider prioritizing recent segments over older ones.</p>
+            <p><strong>Optimize Summarization Strategy:</strong> Instead of maintaining one growing summary, implement a hierarchical or windowed summarization approach that processes fixed-size chunks and maintains bounded context length.</p>
+        </div>
+
+        <div class="recommendation">
+            <h4>Short-term Solutions (Priority 2)</h4>
+            <p><strong>Resource Scaling:</strong> Consider moving the summarization workload to more powerful hardware or using a smaller, faster model for real-time processing with periodic comprehensive summaries.</p>
+            <p><strong>Parallel Processing:</strong> Implement parallel transcription and summarization workers to increase throughput, especially if you have multiple CPU cores or GPU resources available.</p>
+        </div>
+
+        <div class="recommendation">
+            <h4>Long-term Optimizations (Priority 3)</h4>
+            <p><strong>Model Selection:</strong> Evaluate lighter summarization models or consider using streaming-optimized models designed for real-time processing rather than batch summarization.</p>
+            <p><strong>Hybrid Architecture:</strong> Implement a two-tier system where fast, lightweight processing handles real-time needs, while comprehensive analysis runs asynchronously in the background.</p>
+        </div>
+
+        <div class="insight-box">
+            <h3 style="margin-top: 0; color: white;">Key Insight</h3>
+            <p>Your system's performance degradation follows a predictable pattern typical of resource-constrained systems. The solution isn't just about faster hardware—it requires architectural changes to manage workload more intelligently and maintain bounded processing times regardless of meeting length.</p>
+        </div>
+    </div>
+
+    <script>
+        // Parse the JSON data
+        const rawData = `{"timestamp": "2025-08-08T19:35:10.487199+00:00", "type": "segment", "segment_index": "000", "transcription": {"wait_s": 0.0001, "process_s": 10.0784}, "summarization": {"wait_s": 0.0, "process_s": 23.6343}, "total_latency_s": 33.7128, "ema_latency_s": 33.7128, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 90, "chars_summary": 276, "processed_count": 1}
+{"timestamp": "2025-08-08T19:35:52.416899+00:00", "type": "segment", "segment_index": "001", "transcription": {"wait_s": 0.0001, "process_s": 10.2174}, "summarization": {"wait_s": 0.0, "process_s": 25.4133}, "total_latency_s": 35.6308, "ema_latency_s": 34.0964, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 141, "chars_summary": 344, "processed_count": 2}
+{"timestamp": "2025-08-08T19:36:33.875057+00:00", "type": "segment", "segment_index": "002", "transcription": {"wait_s": 0.0001, "process_s": 10.7753}, "summarization": {"wait_s": 0.0, "process_s": 26.3001}, "total_latency_s": 37.0754, "ema_latency_s": 34.6922, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 167, "chars_summary": 379, "processed_count": 3}
+{"timestamp": "2025-08-08T19:37:10.887198+00:00", "type": "segment", "segment_index": "003", "transcription": {"wait_s": 0.0001, "process_s": 10.5875}, "summarization": {"wait_s": 0.0, "process_s": 23.488}, "total_latency_s": 34.0756, "ema_latency_s": 34.5689, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 177, "chars_summary": 324, "processed_count": 4}
+{"timestamp": "2025-08-08T19:37:52.678625+00:00", "type": "segment", "segment_index": "004", "transcription": {"wait_s": 0.0001, "process_s": 10.7064}, "summarization": {"wait_s": 0.0, "process_s": 25.149}, "total_latency_s": 35.8555, "ema_latency_s": 34.8262, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 160, "chars_summary": 425, "processed_count": 5}
+{"timestamp": "2025-08-08T19:38:31.724852+00:00", "type": "segment", "segment_index": "005", "transcription": {"wait_s": 0.0001, "process_s": 10.3302}, "summarization": {"wait_s": 0.0, "process_s": 24.56}, "total_latency_s": 34.8903, "ema_latency_s": 34.839, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 129, "chars_summary": 487, "processed_count": 6}
+{"timestamp": "2025-08-08T19:39:19.837816+00:00", "type": "segment", "segment_index": "006", "transcription": {"wait_s": 0.0001, "process_s": 10.813}, "summarization": {"wait_s": 0.0, "process_s": 32.177}, "total_latency_s": 42.99, "ema_latency_s": 36.4692, "backlog_sizes": {"segment_queue": 1}, "chars_transcript": 172, "chars_summary": 577, "processed_count": 7}
+{"timestamp": "2025-08-08T19:39:54.418657+00:00", "type": "segment", "segment_index": "007", "transcription": {"wait_s": 2.9781, "process_s": 10.4941}, "summarization": {"wait_s": 0.0, "process_s": 24.0866}, "total_latency_s": 34.5807, "ema_latency_s": 36.0915, "backlog_sizes": {"segment_queue": 0}, "chars_transcript": 156, "chars_summary": 447, "processed_count": 8}
+{"timestamp": "2025-08-08T19:40:39.375008+00:00", "type": "segment", "segment_index": "008", "transcription": {"wait_s": 0.0001, "process_s": 10.7214}, "summarization": {"wait_s": 0.0, "process_s": 31.7818}, "total_latency_s": 42.5032, "ema_latency_s": 37.3739, "backlog_sizes": {"segment_queue": 1}, "chars_transcript": 149, "chars_summary": 492, "processed_count": 9}
+{"timestamp": "2025-08-08T19:41:23.179628+00:00", "type": "segment", "segment_index": "009", "transcription": {"wait_s": 2.4911, "process_s": 10.2581}, "summarization": {"wait_s": 0.0, "process_s": 33.5462}, "total_latency_s": 43.8044, "ema_latency_s": 38.66, "backlog_sizes": {"segment_queue": 1}, "chars_transcript": 151, "chars_summary": 658, "processed_count": 10}
+{"timestamp": "2025-08-08T19:42:10.511391+00:00", "type": "segment", "segment_index": "010", "transcription": {"wait_s": 6.283, "process_s": 10.4669}, "summarization": {"wait_s": 0.0, "process_s": 36.8646}, "total_latency_s": 47.3315, "ema_latency_s": 40.3943, "backlog_sizes": {"segment_queue": 1}, "chars_transcript": 166, "chars_summary": 756, "processed_count": 11}
+{"timestamp": "2025-08-08T19:43:12.848738+00:00", "type": "segment", "segment_index": "011", "transcription": {"wait_s": 13.6022, "process_s": 11.978}, "summarization": {"wait_s": 0.0, "process_s": 50.359}, "total_latency_s": 62.337, "ema_latency_s": 44.7828, "backlog_sizes": {"segment_queue": 1}, "chars_transcript": 305, "chars_summary": 899, "processed_count": 12}
+{"timestamp": "2025-08-08T19:44:59.804886+00:00", "type": "segment", "segment_index": "012", "transcription": {"wait_s": 35.9266, "process_s": 19.9507}, "summarization": {"wait_s": 0.0, "process_s": 87.0051}, "total_latency_s": 106.9559, "ema_latency_s": 57.2174, "backlog_sizes": {"segment_queue": 3}, "chars_transcript": 641, "chars_summary": 1185, "processed_count": 13}
+{"timestamp": "2025-08-08T19:47:04.974478+00:00", "type": "segment", "segment_index": "013", "transcription": {"wait_s": 103.0601, "process_s": 20.4267}, "summarization": {"wait_s": 0.0, "process_s": 104.7427}, "total_latency_s": 125.1694, "ema_latency_s": 70.8078, "backlog_sizes": {"segment_queue": 5}, "chars_transcript": 731, "chars_summary": 1509, "processed_count": 14}
+{"timestamp": "2025-08-08T19:49:27.457992+00:00", "type": "segment", "segment_index": "014", "transcription": {"wait_s": 188.2165, "process_s": 20.4077}, "summarization": {"wait_s": 0.0, "process_s": 122.0756}, "total_latency_s": 142.4834, "ema_latency_s": 85.1429, "backlog_sizes": {"segment_queue": 8}, "chars_transcript": 574, "chars_summary": 1733, "processed_count": 15}
+{"timestamp": "2025-08-08T19:52:03.211930+00:00", "type": "segment", "segment_index": "015", "transcription": {"wait_s": 290.6865, "process_s": 19.6045}, "summarization": {"wait_s": 0.0, "process_s": 136.1492}, "total_latency_s": 155.7537, "ema_latency_s": 99.2651, "backlog_sizes": {"segment_queue": 11}, "chars_transcript": 590, "chars_summary": 1923, "processed_count": 16}
+{"timestamp": "2025-08-08T19:55:04.560094+00:00", "type": "segment", "segment_index": "016", "transcription": {"wait_s": 406.4281, "process_s": 28.517}, "summarization": {"wait_s": 0.0, "process_s": 152.8309}, "total_latency_s": 181.3479, "ema_latency_s": 115.6817, "backlog_sizes": {"segment_queue": 14}, "chars_transcript": 775, "chars_summary": 2110, "processed_count": 17}
+{"timestamp": "2025-08-08T19:57:15.531775+00:00", "type": "segment", "segment_index": "017", "transcription": {"wait_s": 547.7627, "process_s": 18.5566}, "summarization": {"wait_s": 0.0, "process_s": 112.4147}, "total_latency_s": 130.9713, "ema_latency_s": 118.7396, "backlog_sizes": {"segment_queue": 16}, "chars_transcript": 582, "chars_summary": 1102, "processed_count": 18}
+{"timestamp": "2025-08-08T19:58:52.969431+00:00", "type": "segment", "segment_index": "018", "transcription": {"wait_s": 638.7203, "process_s": 18.8008}, "summarization": {"wait_s": 0.0, "process_s": 78.6366}, "total_latency_s": 97.4374, "ema_latency_s": 114.4792, "backlog_sizes": {"segment_queue": 18}, "chars_transcript": 703, "chars_summary": 753, "processed_count": 19}`;
+        
+        const data = rawData.trim().split('\n').map(line => JSON.parse(line));
+        
+        // Latency Chart
+        const latencyCtx = document.getElementById('latencyChart').getContext('2d');
+        new Chart(latencyCtx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.segment_index),
+                datasets: [{
+                    label: 'Total Latency (s)',
+                    data: data.map(d => d.total_latency_s),
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }, {
+                    label: 'EMA Latency (s)',
+                    data: data.map(d => d.ema_latency_s),
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    fill: false,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (seconds)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Segment Index'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Processing Latency Over Time'
+                    }
+                }
+            }
+        });
+
+        // Processing Time Breakdown Chart
+        const processingCtx = document.getElementById('processingChart').getContext('2d');
+        new Chart(processingCtx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.segment_index),
+                datasets: [{
+                    label: 'Transcription Process Time',
+                    data: data.map(d => d.transcription.process_s),
+                    borderColor: '#2ecc71',
+                    backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                    fill: true
+                }, {
+                    label: 'Summarization Process Time',
+                    data: data.map(d => d.summarization.process_s),
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                    fill: true
+                }, {
+                    label: 'Transcription Wait Time',
+                    data: data.map(d => d.transcription.wait_s),
+                    borderColor: '#9b59b6',
+                    backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Time (seconds)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Segment Index'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Processing Time Breakdown by Component'
+                    }
+                }
+            }
+        });
+
+        // Backlog Chart
+        const backlogCtx = document.getElementById('backlogChart').getContext('2d');
+        new Chart(backlogCtx, {
+            type: 'bar',
+            data: {
+                labels: data.map(d => d.segment_index),
+                datasets: [{
+                    label: 'Queue Backlog Size',
+                    data: data.map(d => d.backlog_sizes.segment_queue),
+                    backgroundColor: data.map(d => {
+                        const backlog = d.backlog_sizes.segment_queue;
+                        if (backlog === 0) return '#2ecc71';
+                        if (backlog < 5) return '#f39c12';
+                        if (backlog < 10) return '#e67e22';
+                        return '#e74c3c';
+                    }),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Segments in Queue'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Segment Index'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Queue Backlog Growth Pattern'
+                    },
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

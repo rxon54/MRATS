@@ -1,0 +1,81 @@
+MRATS Performance Enhancements Implementation Plan (Derived 2025-08-08)
+
+Legend: [ ] pending, [~] in progress, [x] done, (*) optional/deferred
+
+Phase 1: Instrumentation & Metrics (REQ-034, partial REQ-041)
+[x] 1.1 Add timing wrappers inside ProcessingPipeline.transcribe & summarize (start/end timestamps).
+[x] 1.2 Track queue wait time (time from enqueue to start processing) per segment.
+[x] 1.3 Implement minimal metrics writer (append NDJSON lines to session metrics file under session_root/metrics/metrics.ndjson).
+[x] 1.4 Add CLI flags --metrics-enabled, --metrics-dir (default metrics) and propagate into pipeline.
+[x] 1.5 Include backlog snapshot sizes in metrics entries.
+
+Phase 2: Graceful Stop / Drain (REQ-033)
+[x] 2.1 Modify MeetingRecorder.stop_recording to offer --drain option (or always drain when automation enabled) that: stops ffmpeg, prevents new enqueue, waits for pipeline queue flush.
+[x] 2.2 Add pipeline.drain() method that blocks until internal queue empty and current task finished.
+[x] 2.3 Provide visual progress while draining (remaining queue length updates every N seconds).
+[x] 2.4 Ensure final_summary.md generation deferred until after drain completes.
+
+Phase 3: Queue Threshold Alerts (REQ-035 / REQ-040)
+[ ] 3.1 Add CLI flags: --max-transcription-backlog (int), --max-summary-backlog (int), --latency-warning-seconds (int).
+[ ] 3.2 Add periodic check (worker loop) issuing WARN logs when thresholds exceeded.
+[ ] 3.3 Track moving average latency (EMA or windowed) for comparison to threshold.
+
+Phase 4: Transcript Accumulation Buffer (REQ-036, REQ-042)
+[ ] 4.1 Introduce accumulation manager inside pipeline with buffer state (text, segments list, chars count, start timestamp).
+[ ] 4.2 Add CLI: --summary-accumulation-seconds, --summary-accumulation-chars (0 disables each dimension).
+[ ] 4.3 Modify summarize stage: instead of summarizing single transcript, feed into accumulation; only call Ollama when flush criteria met.
+[ ] 4.4 Implement manual flush command hook (interactive pipeline command or CLI signal) -> flush-summary.
+[ ] 4.5 Assign batch IDs (incrementing) and write summaries as batch_<id>_summary.md; update rolling summary.
+[ ] 4.6 Metrics: mark type=batch, list included segment indices.
+
+Phase 5: Summarization Output Channel (REQ-037)
+[ ] 5.1 Create summaries/summarization_output.log; append each summary with header (timestamp, segment(s) or batch id).
+[ ] 5.2 Ensure log write failure does not abort pipeline (catch & warn).
+
+Phase 6: Enhanced Status Command (REQ-038)
+[ ] 6.1 Extend MeetingRecorder interactive 'status' or add 'automation-status'.
+[ ] 6.2 Display: transcription queue length (immediate = 0 since we integrated? else restructure into separate queues), summarization backlog (accumulation pending flush), last N (5) latencies, average transcription+summary times.
+[ ] 6.3 Provide JSON output option (future) for tooling (optional now).
+
+Phase 7: Extended Metrics Schema (REQ-041 full)
+[ ] 7.1 Add char/token counts (approx tokens = chars / 4 heuristic) for input & output.
+[ ] 7.2 Add cumulative processed segments count, backlog projection time.
+[ ] 7.3 Add optional periodic heartbeat metrics lines (type=heartbeat) if no segments processed for >N seconds.
+
+Phase 8: Queue Persistence (Optional) (REQ-039)
+[ ] 8.1 On enqueue, mirror metadata to persistence file (queue_state.jsonl).
+[ ] 8.2 On start, if file present and --resume-pending flag provided, reload entries not yet processed.
+[ ] 8.3 Purge entries as they are successfully processed.
+
+Cross-Cutting Tasks
+[x] C.1 Update README (new CLI options, hierarchy unaffected).
+[ ] C.2 Update project_requirements_document.md (mark new REQs when implemented).
+[ ] C.3 Add CHANGELOG entry.
+[ ] C.4 Add developer notes for performance tuning.
+[ ] C.5 Provide sample metrics file snippet.
+
+Testing Plan
+[ ] T.1 Synthetic load test script generating N dummy WAVs to enqueue (bypass recording) measuring throughput.
+[ ] T.2 Verify accumulation flush triggers (time-based vs char-based) separately.
+[ ] T.3 Validate graceful stop drains with >5 queued segments.
+[ ] T.4 Threshold alert tests (set very low to trigger quickly) ensuring WARN messages.
+[ ] T.5 Metrics validation: schema fields present & values plausible.
+[ ] T.6 Failure injection: simulate Ollama timeout, Whisper failure, ensure metrics lines still written with error flags.
+
+Acceptance Criteria Mapping
+[ ] A.1 Backlog latency stabilized (manual verification from metrics) <= 1.5× segment duration.
+[ ] A.2 Summarization request count reduced >=30% with accumulation window vs per-segment mode.
+[ ] A.3 No lost segments after graceful stop (all have summaries or flagged as failed).
+
+Deferred / Future
+[ ] F.1 Token-based accumulation using actual tokenization (model-specific) rather than char heuristic.
+[ ] F.2 Prometheus/OpenMetrics exporter.
+[ ] F.3 Web dashboard for real-time queue monitoring.
+
+Implementation Notes
+- Keep instrumentation lightweight: use time.monotonic() for durations.
+- Wrap subprocess calls; capture start/end time before/after run.
+- For queue wait time: store enqueue timestamp inside metadata tuple.
+- Avoid blocking worker thread for accumulation flush intervals: use check after each processed segment + separate timer thread if needed.
+- Rolling summary must remain updated after each batch flush; during accumulation do not overwrite until flush.
+- Consider memory growth: prune accumulation if exceeds hard safety cap (e.g. 100k chars) with forced flush.

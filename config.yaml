@@ -1,7 +1,5 @@
 # Default configuration for Meeting Recorder CLI options
 output_dir: ~/Recordings/Meetings
-format: wav
-bitrate: 192k
 segment_duration: 300
 name: null
 system_only: false
@@ -15,7 +13,7 @@ whisper_model: ~/projects/whisper.cpp/models/ggml-base.bin
 whisper_language: auto
 whisper_threads: 4
 ollama_url: http://coruscant.rxnet:11434
-ollama_model: gemma3:12b
+ollama_model: gemma3n:e4b
 ollama_prompt_initial: |
   This is the first segment of a meeting recording. Please summarize the following transcript:
 ollama_prompt_continuation: |

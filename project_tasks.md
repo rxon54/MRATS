@@ -12,6 +12,8 @@
 - Created a .gitignore to exclude test data, segment outputs, logs, and cache files from the repo.
 - Resolved git rebase and push conflicts to ensure a clean, professional repository state.
 - Verified that only code and documentation are published, not test artifacts.
+- Updated README to reflect actual implementation vs planned hierarchy.
+- Added implementation status addendum to requirements and technical plan documents.
 
 ## Testing Guide
 

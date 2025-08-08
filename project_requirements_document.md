@@ -1,5 +1,20 @@
 # Project Requirements Document - Meeting Recorder Automation
 
+<!-- Implementation Status Addendum (2025-08-08) -->
+**Implementation Status Addendum (2025-08-08)**  
+The live codebase now implements the structured directory hierarchy and WAV-only recording:
+- Implemented: Segmented recording (ffmpeg), per-segment metadata JSON, Whisper.cpp transcription (JSON + TXT), Ollama rolling summarization, background processing queue, file stability checks, CLI + YAML config, basic retry logic, rolling summary file, hierarchical output directories (`segments/`, `transcription/`, `summaries/`), session-level `metadata.json`, generation of `final_summary.md` (copy of rolling summary on stop).
+- Partially Implemented / Different from Spec:
+  - Final consolidated transcript not yet produced (`full_transcript.txt/json` pending); `final_summary.md` is a direct copy of the last rolling summary (no additional synthesis step yet).
+  - No cleanup (`--cleanup-segments`), encryption, batch-processing modes, or health-check routines yet.
+  - Prompt customization flags for initial/continuation present in CLI but not yet wired into pipeline logic (only system prompt used).
+  - Removed `--format` / `--bitrate`; WAV enforced for performance (spec previously allowed mp3).
+- Not Yet Implemented (Roadmap): Aggregate / full transcript generation, enhanced final summary synthesis, encryption, adaptive segmentation, explicit batch vs live modes, persistent processing logs separate from stdout, service health monitoring, segment deletion policies.
+
+The remainder of this document remains as a forward-looking specification; checked **[COMPLETED]** markers refer to logical design goals rather than the full directory or feature build-out described. See README for a concise summary of current behavior.
+
+---
+
 ## Project Title: Meeting Recorder with Automated Transcription & Summarization
 
 **Version:** 1.0  
@@ -582,6 +597,111 @@ The successful implementation of this system will provide users with:
 
 ---
 
-**Document Status**: Draft v1.0  
-**Next Review**: Phase 1 completion  
-**Approval Required**: Technical Lead, Product Owner
+## 12. Performance Enhancements Addendum (2025-08-08)
+
+### 12.1 Context & Problem Statement
+Recent usage indicates that end-to-end processing latency (Whisper transcription + Ollama summarization) can exceed per-segment duration, creating a growing backlog. Abrupt recording termination currently halts further processing, leaving pending segments without summaries. Operator visibility into queue health is limited, complicating tuning and troubleshooting.
+
+### 12.2 Observed Issues
+- Processing latency > segment duration → backlog growth.
+- Summarization queue starves when model responses are slow / large.
+- Recording stop kills pipeline prematurely (unprocessed segments lost).
+- No batching: every small segment triggers full LLM prompt → overhead amplification.
+- Limited introspection: cannot see queue lengths, processing times, throughput.
+- Hard to experiment with optimal segment size vs summarization batch size.
+
+### 12.3 Proposed Enhancements
+| Area | Enhancement | Rationale |
+|------|-------------|-----------|
+| Graceful Stop | Allow recorder stop while pipeline drains remaining queue | Prevent data loss & ensure completion |
+| Benchmarking | Instrument transcription + summarization timing & queue wait | Identify bottlenecks quantitatively |
+| Thresholds | Configurable backlog & latency thresholds w/ warnings | Early overload detection |
+| Accumulation | Batch multiple transcripts before summarization (time or token window) | Reduce LLM call overhead, improve summary coherence |
+| Summarization Channel | Dedicated output stream / log for summaries only | Cleaner monitoring / integration |
+| Queue Dashboard | CLI status exposing queue sizes, current task, avg times | Operational visibility |
+| Persistence (Optional) | Persist pending queue on shutdown | Crash recovery / continuity |
+| Metrics Export (Future) | Structured JSON/NDJSON metrics file | External tooling & analysis |
+
+### 12.4 Transcript Accumulation Strategy
+Two accumulation modes (configurable & mutually exclusive):
+1. Time-based window (e.g. accumulate transcripts for N seconds before summarizing)
+2. Token-based window (accumulate until approximate token count or character length reached)
+
+Flush Triggers:
+- Time window elapsed OR
+- Token/char budget reached OR
+- Manual flush (on user command / graceful stop) OR
+- Hard upper limit (failsafe) to avoid unbounded growth
+
+Outputs:
+- Per-batch summary still stored as `segment_XXX_summary.md`? (Option A) OR new naming `batch_YYY_summary.md` (Option B). Selected approach (initial): Option B for clarity.
+- Rolling summary updated after each batch flush.
+
+### 12.5 New / Updated Functional Requirements
+- **REQ-033**: System SHALL support graceful recording stop while continuing to process queued transcription & summarization tasks until completion.
+- **REQ-034**: System SHALL record benchmark metrics per segment: transcription wall time, summarization wall time, queue wait time, total latency.
+- **REQ-035**: System SHALL emit warnings when (a) transcription backlog exceeds configurable `--max-transcription-backlog`, (b) average processing latency exceeds 2× segment duration, (c) summarization backlog exceeds `--max-summary-backlog`.
+- **REQ-036**: System SHALL provide transcript accumulation batching with configurable time window (`--summary-accumulation-seconds`) and/or token/character budget (`--summary-accumulation-chars`).
+- **REQ-037**: System SHALL provide a dedicated summarization output log file (`summaries/summarization_output.log`) containing only completed summaries (chronologically appended).
+- **REQ-038**: System SHALL expose queue metrics via an enhanced CLI command `status automation` (or new `automation-status`) including: counts (queued/processing/completed), last N processing times, rolling averages, backlog estimates.
+- **REQ-039**: System SHOULD (optional phase) persist unprocessed queue state to disk on exit and restore on restart if automation enabled.
+- **REQ-040**: System SHALL provide configurable thresholds: `--max-transcription-backlog`, `--max-summary-backlog`, `--latency-warning-seconds`.
+- **REQ-041**: System SHALL write structured metrics to `metrics/metrics.ndjson` (one JSON object per completed processing unit) for external analysis (phase 2 of enhancements).
+- **REQ-042**: System SHOULD allow manual flush of accumulation buffer via interactive command `flush-summary`.
+
+### 12.6 Non-Functional Additions
+- **Performance**: Benchmark instrumentation adds <2% overhead (target).
+- **Reliability**: Graceful stop guarantees in-flight queue completion barring system shutdown.
+- **Observability**: Metrics collection is append-only, resilient to partial writes, and human-readable JSON lines.
+
+### 12.7 Configuration Additions (Proposed)
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--summary-accumulation-seconds` | int | 0 (disabled) | Time window for transcript accumulation batching |
+| `--summary-accumulation-chars` | int | 0 (disabled) | Character budget for accumulation flush |
+| `--max-transcription-backlog` | int | 10 | Warning threshold for transcription queue |
+| `--max-summary-backlog` | int | 10 | Warning threshold for summarization queue |
+| `--latency-warning-seconds` | int | 600 | Warning if avg total latency exceeds this |
+| `--metrics-enabled` | flag | off | Enable metrics collection & NDJSON export |
+| `--metrics-dir` | path | metrics | Relative path under session root for metrics |
+
+### 12.8 Metrics Schema (Initial Draft)
+Example NDJSON line (one per segment or batch):
+```json
+{
+  "timestamp": "2025-08-08T15:30:45.123Z",
+  "type": "segment",            
+  "segment_index": 3,
+  "batch_id": null,
+  "transcription": {"wait_s": 2.1, "process_s": 14.5, "segments": 12},
+  "summarization": {"wait_s": 5.2, "process_s": 9.8, "chars_input": 3421, "chars_output": 812},
+  "total_latency_s": 31.6,
+  "backlog_sizes": {"transcription_queue": 1, "summary_queue": 0}
+}
+```
+(Batch summary entries use `type": "batch"` and include aggregated indices list.)
+
+### 12.9 Implementation Phasing
+1. Instrumentation & Metrics (REQ-034, partial REQ-041 minimal viable metrics file)
+2. Graceful Stop (REQ-033)
+3. Queue Threshold Alerts (REQ-035 / REQ-040)
+4. Accumulation Buffer (REQ-036) + manual flush (REQ-042)
+5. Summarization Output Log (REQ-037)
+6. Enhanced Status Command (REQ-038)
+7. Extended Metrics Schema (complete REQ-041)
+8. Optional Queue Persistence (REQ-039)
+
+### 12.10 Risks & Mitigations (New)
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Over-accumulation reduces summary granularity | Loss of temporal detail | Provide configurable max window & manual flush |
+| Metrics file growth | Storage consumption | Rotate or compress after session (future enhancement) |
+| Graceful stop prolongs session tail latency | User confusion | Display draining status with ETA |
+
+### 12.11 Success Criteria (Additions)
+- Backlog growth stabilized: average processing latency ≤ 1.5× segment duration under target workload.
+- Summarization call frequency reduced ≥30% with accumulation without loss of key content.
+- Operators can view real-time queue metrics in <1s via CLI.
+- No segment lost during graceful stop in benchmark tests.
+
+---
