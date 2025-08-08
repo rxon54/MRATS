@@ -23,6 +23,7 @@ Thumbs.db
 # Ignore other logs and temp files
 *.log
 *.tmp
+*.md
 
 # Allow config and documentation
 !config.yaml
