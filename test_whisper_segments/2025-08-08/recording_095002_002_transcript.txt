@@ -1,7 +1,0 @@
- 99% in some benchmark, it means you need something else to really capture how great the model is.
- And one thing we've done very differently with this model is really focused on not just
- these numbers, but really on real-world application. It being really useful to you in your daily workflow.
- So, hearing about it is much less exciting than seeing it. So to show you this model in action,
- I'd like to welcome Adi and Brian to the stage.
- Thanks, Greg. I'm Brian, a solutions architect on the startup
- see you.

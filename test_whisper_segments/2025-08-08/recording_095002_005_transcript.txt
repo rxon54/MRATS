@@ -1,7 +1,0 @@
- during this process. So right away, you're going to see that it's going to tell you what's plan
- up front. It's going to tell you how it's going to look for the bug, maybe how it's going to fix it.
- This kind of communication shows builds trust during a coding session and helps you redirect
- if you need to, but you don't need to. I like how it's giving you updates, like it said,
- it's going to search and now it's continuing. Yeah, it searches faster than me. I don't,
- it's using the same best practices that I would while I was hunting this down, but it is
- Much.

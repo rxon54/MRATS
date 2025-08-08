@@ -1,5 +1,0 @@
- like cursor and we identified frustrations and rough edges and we boiled it all down into four personality traits.
- Autonomy, collaboration, communication, context management, and testing.
- We turned those into a rubric that we used to shape the model's behavior and then we tuned it
- until it felt like a collaborative teammate while we were using it.
- It's been really amazing to see the team really doing the grind of like
