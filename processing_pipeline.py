@@ -161,6 +161,7 @@ class ProcessingPipeline:
         cmd = [
             abs_whisper_path,
             "-m", abs_model_path,
+            "-t", str(self.whisper_threads),
             "-oj",
             "-of", transcript_base,
             "-l", self.whisper_language,
