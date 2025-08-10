@@ -213,23 +213,64 @@ class MeetingRecorder:
             return False
 
     def _wait_for_stable_file(self, path, min_size=1024, stable_time=1.0, timeout=10):
-        """Wait until file exists, is nonzero, and size is stable for stable_time seconds."""
+        """Wait until file exists, is nonzero, and size is stable for stable_time seconds.
+        For segment files, also verify audio duration matches expected segment duration."""
         import time
         start = time.time()
         last_size = -1
         stable_since = None
+        
+        # For segment files, also check audio duration
+        is_segment_file = '/segments/' in path and path.endswith('.wav')
+        expected_duration = self.segment_duration if is_segment_file else None
+        
         while time.time() - start < timeout:
             if os.path.exists(path):
                 size = os.path.getsize(path)
                 if size >= min_size:
+                    # Check if size is stable
+                    size_stable = False
                     if size == last_size:
                         if stable_since is None:
                             stable_since = time.time()
                         elif time.time() - stable_since >= stable_time:
-                            return True
+                            size_stable = True
                     else:
                         stable_since = None
                     last_size = size
+                    
+                    # For segment files, also verify audio duration
+                    if size_stable and is_segment_file and expected_duration:
+                        try:
+                            # Get actual audio duration
+                            import subprocess
+                            result = subprocess.run([
+                                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                                '-of', 'csv=p=0', path
+                            ], capture_output=True, text=True, timeout=5)
+                            
+                            if result.returncode == 0:
+                                actual_duration = float(result.stdout.strip())
+                                # Allow segment to be slightly shorter due to end-of-stream
+                                if actual_duration >= (expected_duration - 2.0):
+                                    self.debug(f"Segment {path} ready: {actual_duration:.1f}s (expected {expected_duration}s)")
+                                    return True
+                                else:
+                                    #self.debug(f"Segment {path} still growing: {actual_duration:.1f}s / {expected_duration}s")
+                                    # Reset stability timer since file is still growing
+                                    stable_since = None
+                                    continue
+                            else:
+                                # If ffprobe fails, fall back to size-only check
+                                self.debug(f"Could not probe {path}, using size-only check")
+                                return True
+                        except Exception as e:
+                            self.debug(f"Error probing {path}: {e}, using size-only check")
+                            return True
+                    elif size_stable and not is_segment_file:
+                        # Non-segment files just need size stability
+                        return True
+                        
             time.sleep(0.2)
         return False
 
@@ -257,10 +298,12 @@ class MeetingRecorder:
                     }
                     save_recording_metadata(f, metadata)
                     if self.automation_enabled:
-                        if self._wait_for_stable_file(f, min_size=1024, stable_time=1.0, timeout=10):
+                        # Use longer timeout for segment files that need to reach full duration
+                        timeout = self.segment_duration + 10 if '/segments/' in f else 10
+                        if self._wait_for_stable_file(f, min_size=1024, stable_time=1.0, timeout=timeout):
                             self.pipeline.enqueue_segment(f, metadata)
                         else:
-                            print(f"[Recorder][WARN] Segment {f} did not become stable/nonzero in time, skipping automation.")
+                            print(f"[Recorder][WARN] Segment {f} did not become stable/complete in time, skipping automation.")
             time.sleep(2)
 
     def stop_recording(self, post_process=False, drain=True):
@@ -424,10 +467,17 @@ if __name__ == "__main__":
     parser.add_argument("--start", action="store_true", help="Start recording immediately")
     parser.add_argument("--segment-duration", type=int, default=cfg("segment_duration", 300), help="Segment duration in seconds (default: 300)")
     parser.add_argument("--enable-automation", action="store_true", default=cfg("enable_automation", False), help="Enable automated transcription and summarization pipeline")
+    # Whisper backend and params
+    parser.add_argument("--whisper-backend", choices=["cli", "pywhispercpp", "server"], default=cfg("whisper_backend", "cli"), help="Transcription backend: CLI (default), pywhispercpp binding, or HTTP server")
     parser.add_argument("--whisper-path", default=cfg("whisper_path", "/usr/local/bin/whisper"), help="Path to Whisper.cpp executable (default: /usr/local/bin/whisper)")
     parser.add_argument("--whisper-model", default=cfg("whisper_model", "base"), help="Whisper.cpp model path or size (tiny|base|small|medium|large)")
     parser.add_argument("--whisper-language", default=cfg("whisper_language", "auto"), help="Language code for Whisper.cpp (default: auto)")
     parser.add_argument("--whisper-threads", type=int, default=cfg("whisper_threads", 4), help="CPU threads for Whisper.cpp (default: 4)")
+    parser.add_argument("--whisper-server-url", default=cfg("whisper_server_url", "http://127.0.0.1:8080"), help="Whisper.cpp server URL (default: http://127.0.0.1:8080)")
+    parser.add_argument("--whisper-server-timeout", type=int, default=cfg("whisper_server_timeout", 120), help="Whisper.cpp server timeout in seconds (default: 120)")
+    parser.add_argument("--pad-silence-ms", type=int, default=cfg("pad_silence_ms", 300), help="Pad this many milliseconds of trailing silence per segment before transcription (default: 300)")
+    parser.add_argument("--pre-roll-ms", type=int, default=cfg("pre_roll_ms", 300), help="Prepend this many milliseconds from previous segment for transcription context (default: 300)")
+    # Ollama
     parser.add_argument("--ollama-url", default=cfg("ollama_url", "http://localhost:11434"), help="Ollama server URL (default: http://localhost:11434)")
     parser.add_argument("--ollama-model", default=cfg("ollama_model", "llama2"), help="Ollama model name (default: llama2)")
     parser.add_argument("--ollama-system-prompt", default=cfg("ollama_system_prompt", None), help="Ollama system prompt (persona/context)")
@@ -461,10 +511,15 @@ if __name__ == "__main__":
         metrics_dir_name=args.metrics_dir
     )
 
+    recorder.pipeline.whisper_backend = args.whisper_backend
     recorder.pipeline.whisper_path = args.whisper_path
     recorder.pipeline.whisper_model = args.whisper_model
     recorder.pipeline.whisper_language = args.whisper_language
     recorder.pipeline.whisper_threads = args.whisper_threads
+    recorder.pipeline.whisper_server_url = args.whisper_server_url
+    recorder.pipeline.whisper_server_timeout = args.whisper_server_timeout
+    recorder.pipeline.pad_silence_ms = max(0, int(args.pad_silence_ms or 0))
+    recorder.pipeline.pre_roll_ms = max(0, int(args.pre_roll_ms or 0))
     recorder.pipeline.ollama_url = args.ollama_url
     recorder.pipeline.ollama_model = args.ollama_model
     if args.ollama_system_prompt is not None:

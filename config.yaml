@@ -8,10 +8,15 @@ source_system: null
 source_mic: null
 post_process: false
 enable_automation: false
+whisper_backend: cli  # cli, pywhispercpp, or server
 whisper_path: ~/projects/whisper.cpp/build/bin/whisper-cli
 whisper_model: ~/projects/whisper.cpp/models/ggml-base.bin
 whisper_language: auto
 whisper_threads: 8
+whisper_server_url: http://127.0.0.1:8080
+whisper_server_timeout: 120
+pad_silence_ms: 300
+pre_roll_ms: 300
 ollama_url: http://coruscant.rxnet:11434
 ollama_model: gemma3n:e4b
 ollama_prompt_initial: |

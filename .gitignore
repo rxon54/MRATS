@@ -12,6 +12,12 @@ __pycache__/
 *_transcript.txt
 *_transcript.json
 recordings.log
+test_*
+debug_*
+analyze_*
+tasks.json
+
+
 
 # Ignore VSCode and editor settings
 .vscode/

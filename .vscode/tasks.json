@@ -4,9 +4,37 @@
 		{
 			"type": "shell",
 			"label": "Test Meeting Recorder with Whisper.cpp debug logging",
-			"command": "python3 meeting_recorder.py --start --enable-automation --segment-duration 10 --output-dir ./test_whisper_segments --system-only",
+			"command": "python3 meeting_recorder.py --start --enable-automation --segment-duration 30 --output-dir ./test_whisper_segments --system-only",
 			"args": [],
 			"isBackground": false
+		},
+		{
+			"type": "shell",
+			"label": "Test Meeting Recorder (10s segments)",
+			"command": "python3 meeting_recorder.py --start --enable-automation --segment-duration 10 --output-dir ./test_whisper_segments_10s --system-only",
+			"args": [],
+			"isBackground": false
+		},
+		{
+			"type": "shell",
+			"label": "Test Meeting Recorder (60s segments)",
+			"command": "python3 meeting_recorder.py --start --enable-automation --segment-duration 60 --output-dir ./test_whisper_segments_60s --system-only",
+			"args": [],
+			"isBackground": false
+		},
+		{
+			"type": "shell",
+			"label": "Test Meeting Recorder with Server Backend",
+			"command": "python3 meeting_recorder.py --start --enable-automation --whisper-backend server --segment-duration 30 --output-dir ./test_whisper_server --system-only",
+			"args": [],
+			"isBackground": false
+		},
+		{
+			"type": "shell",
+			"label": "Start Whisper.cpp Server",
+			"command": "~/projects/whisper.cpp/build/bin/whisper-server -m ~/projects/whisper.cpp/models/ggml-base.bin -t 8 --host 127.0.0.1 --port 8080",
+			"args": [],
+			"isBackground": true
 		}
 	]
 }
