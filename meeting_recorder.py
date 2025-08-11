@@ -18,7 +18,7 @@ from processing_pipeline import ProcessingPipeline
 class MeetingRecorder:
     def __init__(self, output_dir="~/Recordings/Meetings",
                 source_system=None, source_mic=None, combined=True, custom_name=None, segment_duration=300,
-                automation_enabled=False, metrics_enabled=False, metrics_dir_name="metrics"):
+                automation_enabled=False, metrics_enabled=False, metrics_dir_name="metrics", summary_batch_size=1):
         # Always use WAV for processing
         self.output_dir = os.path.expanduser(output_dir)
         self.format = "wav"  # Forced WAV
@@ -38,7 +38,7 @@ class MeetingRecorder:
         self.recording_started = None
         self.current_session_dir = None  # Root of session directory hierarchy
         self.session_metadata_path = None
-        self.pipeline = ProcessingPipeline(automation_enabled=automation_enabled)
+        self.pipeline = ProcessingPipeline(automation_enabled=automation_enabled, summary_batch_size=summary_batch_size)
         self.pipeline.metrics_enabled = metrics_enabled
         self.pipeline.metrics_dir_name = metrics_dir_name
         
@@ -451,7 +451,7 @@ if __name__ == "__main__":
             config = yaml.safe_load(f) or {}
 
     parser = argparse.ArgumentParser(description="Record meeting audio from system and/or microphone")
-    def cfg(key, default=None):
+    def cfg(key, default):
         v = config.get(key, default)
         return None if v == 'null' else v
 
@@ -459,11 +459,11 @@ if __name__ == "__main__":
     # Removed --format (always wav)
     # Removed --bitrate (not applicable for wav)
     parser.add_argument("--list-sources", "-l", action="store_true", help="List available PulseAudio sources and exit")
-    parser.add_argument("--source-system", "-s", default=cfg("source_system"), help="Specify system audio source")
-    parser.add_argument("--source-mic", "-m", default=cfg("source_mic"), help="Specify microphone source")
+    parser.add_argument("--source-system", "-s", default=cfg("source_system", None), help="Specify system audio source")
+    parser.add_argument("--source-mic", "-m", default=cfg("source_mic", None), help="Specify microphone source")
     parser.add_argument("--system-only", action="store_true", default=cfg("system_only", False), help="Record only system audio (no microphone)")
     parser.add_argument("--mic-only", action="store_true", default=cfg("mic_only", False), help="Record only microphone (no system audio)")
-    parser.add_argument("--name", "-n", default=cfg("name"), help="Custom session name prefix")
+    parser.add_argument("--name", "-n", default=cfg("name", None), help="Custom session name prefix")
     parser.add_argument("--start", action="store_true", help="Start recording immediately")
     parser.add_argument("--segment-duration", type=int, default=cfg("segment_duration", 300), help="Segment duration in seconds (default: 300)")
     parser.add_argument("--enable-automation", action="store_true", default=cfg("enable_automation", False), help="Enable automated transcription and summarization pipeline")
@@ -485,6 +485,7 @@ if __name__ == "__main__":
     parser.add_argument("--ollama-prompt-continuation", default=cfg("ollama_prompt_continuation", None), help="(Reserved) Custom continuation summary prompt")
     parser.add_argument("--metrics-enabled", action="store_true", help="Enable metrics collection (timings, backlog) for automation pipeline")
     parser.add_argument("--metrics-dir", default=cfg("metrics_dir", "metrics"), help="Relative directory name under session root for metrics output (default: metrics)")
+    parser.add_argument("--summary-batch-size", type=int, default=cfg("summary_batch_size", 1), help="Number of transcription segments to concatenate for each summarization batch (default: 1, i.e., per-segment)")
 
     args = parser.parse_args()
 
@@ -508,7 +509,8 @@ if __name__ == "__main__":
         segment_duration=args.segment_duration,
         automation_enabled=args.enable_automation,
         metrics_enabled=args.metrics_enabled,
-        metrics_dir_name=args.metrics_dir
+        metrics_dir_name=args.metrics_dir,
+        summary_batch_size=args.summary_batch_size
     )
 
     recorder.pipeline.whisper_backend = args.whisper_backend
@@ -524,6 +526,8 @@ if __name__ == "__main__":
     recorder.pipeline.ollama_model = args.ollama_model
     if args.ollama_system_prompt is not None:
         recorder.pipeline.system_prompt = args.ollama_system_prompt
+    # Propagate summary_batch_size
+    recorder.pipeline.summary_batch_size = args.summary_batch_size
 
     if args.start:
         print("Recording started. Press Ctrl+C to stop.")

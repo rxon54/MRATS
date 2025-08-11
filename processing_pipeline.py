@@ -16,7 +16,7 @@ class ProcessingPipeline:
        segments → [Transcription Queue] → transcripts → [Summarization Queue] → summaries
     """
     def __init__(self, automation_enabled=True, whisper_path="/usr/local/bin/whisper", whisper_model="base", whisper_language="auto", whisper_threads=4,
-                 ollama_url="http://localhost:11434", ollama_model="llama2", system_prompt=None):
+                 ollama_url="http://localhost:11434", ollama_model="llama2", system_prompt=None, summary_batch_size=1):
         self.automation_enabled = automation_enabled
         # Independent queues
         self.transcribe_queue = queue.Queue()
@@ -57,6 +57,9 @@ class ProcessingPipeline:
         self.pad_silence_ms = 300
         # New: add small pre-roll from previous segment to improve boundary recognition (ms)
         self.pre_roll_ms = 300
+        # New: batch size for summarization
+        self.summary_batch_size = summary_batch_size
+        self._batch_summaries = []
 
     def set_session_dir(self, session_dir):
         self.session_dir = session_dir
@@ -113,6 +116,8 @@ class ProcessingPipeline:
                 transcript = self.transcribe(segment_path, metadata)
                 proc_s = time.monotonic() - start
                 if self.metrics_enabled:
+                    chars = len(transcript) if transcript else 0
+                    tokens = chars // 4
                     self._write_metrics_line({
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "stage": "transcription",
@@ -123,7 +128,8 @@ class ProcessingPipeline:
                             "transcribe": self.transcribe_queue.qsize(),
                             "summarize": self.summarize_queue.qsize()
                         },
-                        "chars_transcript": len(transcript) if transcript else 0
+                        "chars_transcript": chars,
+                        "tokens_transcript": tokens
                     })
                 # handoff to summarization queue (non-blocking)
                 self.enqueue_summarization(segment_path, transcript, metadata)
@@ -134,49 +140,139 @@ class ProcessingPipeline:
                 self._tx_busy = False
 
     def _sum_worker(self):
-        while self.running:
+        batch = []
+        batch_metadata = []
+        batch_count = 0
+        self._batch_summaries = []
+        while self.running or not self.summarize_queue.empty():
             try:
                 job = self.summarize_queue.get(timeout=1)
             except queue.Empty:
+                # If not running and queue is empty, flush leftovers
+                if not self.running and batch:
+                    self._process_summary_batch(batch, batch_metadata, batch_count, self._batch_summaries)
+                    batch = []
+                    batch_metadata = []
                 continue
-            self._sum_busy = True
-            try:
-                segment_path = job['segment_path']
-                transcript = job.get('transcript', '')
-                metadata = job.get('metadata', {})
-                start = time.monotonic()
-                wait_s = start - metadata.get('sum_enqueue_monotonic', start)
-                summary = self.summarize(segment_path, transcript, metadata)
-                proc_s = time.monotonic() - start
-                total_latency = None  # total end-to-end can be computed from tx enqueue if desired
-                if self.metrics_enabled:
-                    self._write_metrics_line({
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "stage": "summarization",
-                        "segment_index": metadata.get('segment_index'),
-                        "wait_s": round(wait_s, 4),
-                        "process_s": round(proc_s, 4),
-                        "queues": {
-                            "transcribe": self.transcribe_queue.qsize(),
-                            "summarize": self.summarize_queue.qsize()
-                        },
-                        "chars_summary": len(summary) if summary else 0
-                    })
-                # optional: final aggregation hook
-                self.save_outputs(segment_path, transcript, summary, metadata)
-                self._processed_sum += 1
-            except Exception as e:
-                print(f"[Pipeline][ERROR] Summarization worker exception: {e}")
-            finally:
-                self._sum_busy = False
+            segment_path = job['segment_path']
+            transcript = job.get('transcript', '')
+            metadata = job.get('metadata', {})
+            batch.append(transcript)
+            batch_metadata.append(metadata)
+            if len(batch) >= self.summary_batch_size:
+                self._process_summary_batch(batch, batch_metadata, batch_count, self._batch_summaries)
+                batch = []
+                batch_metadata = []
+                batch_count += 1
+        # After draining, flush any leftovers
+        if batch:
+            self._process_summary_batch(batch, batch_metadata, batch_count, self._batch_summaries)
+            batch = []
+            batch_metadata = []
+        # Synthesize final summary from all batch summaries
+        if self._batch_summaries:
+            self._synthesize_final_summary(self._batch_summaries)
+
+    def _process_summary_batch(self, batch, batch_metadata, batch_count, batch_summaries):
+        batch_text = '\n\n'.join(batch)
+        # Use first segment's metadata for index, etc.
+        first_meta = batch_metadata[0] if batch_metadata else {}
+        # Summarize the batch
+        summary = self.summarize(None, batch_text, first_meta)
+        # Save batch summary file
+        if self.session_dir:
+            summaries_dir = os.path.join(self.session_dir, 'summaries')
+            os.makedirs(summaries_dir, exist_ok=True)
+            batch_summary_path = os.path.join(summaries_dir, f'batch_{batch_count:03d}_summary.md')
+            with open(batch_summary_path, 'w') as f:
+                f.write(summary.strip() + '\n')
+        batch_summaries.append(summary)
+        # Metrics: chars and tokens
+        if self.metrics_enabled:
+            chars = len(batch_text)
+            tokens = chars // 4
+            self._write_metrics_line({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "stage": "summarization_batch",
+                "batch_index": batch_count,
+                "chars_batch": chars,
+                "tokens_batch": tokens
+            })
+
+    def _synthesize_final_summary(self, batch_summaries):
+        all_text = '\n\n'.join(batch_summaries)
+        prompt = (
+            "You are to write a comprehensive, concise summary of the entire meeting based on the following batch summaries. "
+            "Focus on key decisions, topics, and action items.\n\n"
+            f"Batch Summaries:\n{all_text}\n\nFinal Summary:"
+        )
+        data = {"model": self.ollama_model, "prompt": prompt, "stream": False}
+        try:
+            response = requests.post(f"{self.ollama_url}/api/generate", json=data, timeout=600)
+            response.raise_for_status()
+            final_summary = response.json().get("response", "").strip()
+            if self.session_dir:
+                summaries_dir = os.path.join(self.session_dir, 'summaries')
+                os.makedirs(summaries_dir, exist_ok=True)
+                final_path = os.path.join(summaries_dir, 'final_summary.md')
+                with open(final_path, 'w') as f:
+                    f.write(final_summary + '\n')
+            # Metrics: chars and tokens
+            if self.metrics_enabled:
+                chars = len(all_text)
+                tokens = chars // 4
+                self._write_metrics_line({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "stage": "final_summary",
+                    "chars_final_input": chars,
+                    "tokens_final_input": tokens,
+                    "chars_final_summary": len(final_summary),
+                    "tokens_final_summary": len(final_summary) // 4
+                })
+        except Exception as e:
+            print(f"[Pipeline][ERROR] Final summary synthesis failed: {e}")
 
     def drain(self, poll_interval=1.0):
-        """Block until both queues are empty and both workers are idle."""
+        """Block until both queues are empty and both workers are idle. Then synthesize final summary and transcript."""
         print("[Pipeline] Draining: waiting for all queued work to finish...")
         while self.running and (not self.is_idle() or not self.transcribe_queue.empty() or not self.summarize_queue.empty()):
             print(f"[Pipeline] Queues - TX:{self.transcribe_queue.qsize()} SUM:{self.summarize_queue.qsize()} | busy TX:{self._tx_busy} SUM:{self._sum_busy}")
             time.sleep(poll_interval)
         print("[Pipeline] Drain complete.")
+        # Always synthesize final summary and transcript at the end
+        self.generate_final_transcript()
+        if hasattr(self, '_batch_summaries') and self._batch_summaries:
+            self._synthesize_final_summary(self._batch_summaries)
+
+    def generate_final_transcript(self):
+        """Aggregate all segment transcripts into final_transcript.txt and .json"""
+        if not self.session_dir:
+            return
+        transcription_dir = os.path.join(self.session_dir, 'transcription')
+        summaries_dir = os.path.join(self.session_dir, 'summaries')
+        os.makedirs(summaries_dir, exist_ok=True)
+        txt_out = os.path.join(transcription_dir, 'final_transcript.txt')
+        json_out = os.path.join(transcription_dir, 'final_transcript.json')
+        transcripts = []
+        json_segments = []
+        for fname in sorted(os.listdir(transcription_dir)):
+            if fname.endswith('_transcript.txt'):
+                with open(os.path.join(transcription_dir, fname), 'r', encoding='utf-8', errors='replace') as f:
+                    transcripts.append(f.read().strip())
+            elif fname.endswith('_transcript.json'):
+                try:
+                    with open(os.path.join(transcription_dir, fname), 'r', encoding='utf-8') as jf:
+                        data = json.load(jf)
+                        json_segments.extend(data.get('segments', []))
+                except Exception:
+                    pass
+        # Write final_transcript.txt
+        with open(txt_out, 'w') as f:
+            f.write('\n\n'.join(transcripts) + '\n')
+        # Write final_transcript.json
+        with open(json_out, 'w') as jf:
+            json.dump({'segments': json_segments}, jf, indent=2)
+        print(f"[Pipeline] Final transcript written: {txt_out}, {json_out}")
 
     def is_idle(self):
         return (not self._tx_busy) and (not self._sum_busy)
@@ -533,7 +629,7 @@ class ProcessingPipeline:
                 wav_duration_s = self._get_wav_duration_seconds(segment_path_abs)
                 last_offset_ms = 0
                 if seg_list:
-                    last_offset_ms = max([s['offsets']['to'] for s in seg_list]) - int(ctx_info.get('prev_tail_ms', 0) or 0)
+                    last_offset_ms = max([s['offsets']['to'] for s in seg_list]) - int(ctx_info.get('prev_tail_ms', 0))
                 last_effective_ms = min(last_offset_ms, int(wav_duration_s * 1000.0)) if wav_duration_s else last_offset_ms
                 suspected_truncated = bool(wav_duration_s and last_effective_ms and (wav_duration_s - (last_effective_ms/1000.0) > 3.0))
                 if suspected_truncated:
@@ -837,7 +933,7 @@ class ProcessingPipeline:
         if not transcript.strip():
             print("[Pipeline][WARN] Empty transcript, skipping summarization.")
             return ""
-        seg_index = metadata.get('segment_index')
+        seg_index = metadata.get('segment_index') if metadata else None
         prev_roll = self.rolling_summary_text or ""
         # Structured, tagged output to avoid model overwriting issues
         instruction = (
@@ -876,16 +972,12 @@ class ProcessingPipeline:
                 seg_summary = resp_text
             # Persist rolling summary
             self.rolling_summary_text = updated_roll or seg_summary or prev_roll
-            # Save files
-            seg_path_abs = os.path.abspath(segment_path) if segment_path else ''
-            summaries_dir = None
-            if seg_path_abs:
+            # Save files only for per-segment summaries
+            if segment_path:
+                seg_path_abs = os.path.abspath(segment_path)
                 session_dir, segments_dir, transcription_dir, summaries_dir = self._derive_session_dirs(seg_path_abs)
-            else:
-                summaries_dir = os.path.join(self.session_dir, 'summaries') if self.session_dir else None
-            if summaries_dir:
                 os.makedirs(summaries_dir, exist_ok=True)
-                base_segment_name = os.path.splitext(os.path.basename(seg_path_abs))[0] if seg_path_abs else 'segment_unknown'
+                base_segment_name = os.path.splitext(os.path.basename(seg_path_abs))[0]
                 # Per-segment summary file
                 summary_path = os.path.join(summaries_dir, base_segment_name + '_summary.md')
                 try:
@@ -941,7 +1033,7 @@ class ProcessingPipeline:
         return 0.0
 
     def save_outputs(self, segment_path, transcript, summary, metadata):
-        # Placeholder for any additional aggregation logic
+        # No-op: batch and final summary logic handled elsewhere
         pass
 
     def wait_for_file_stable(self, path, min_size=32, stable_time=0.5, timeout=10):

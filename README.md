@@ -2,9 +2,12 @@
 Meeting Recorder Automated Transcription & Summarization (MRATS): Automated, privacy-focused meeting recording, transcription (Whisper.cpp), and contextual summarization (Ollama).
 
 ## Status Note (Current Implementation vs Plans)
-UPDATED (2025-08-10): The processing pipeline now uses decoupled queues with independent workers for transcription and summarization. Multiple Whisper.cpp backend options are available including HTTP server backend for distributed processing. Critical race condition and truncation issues have been resolved.
+UPDATED (2025-08-11): The processing pipeline now uses decoupled queues with independent workers for transcription and summarization. Multiple Whisper.cpp backend options are available including HTTP server backend for distributed processing. Critical race condition and truncation issues have been resolved.
 
-**Recent Fixes (2025-08-10)**:
+**Recent Fixes (2025-08-11)**:
+- ✅ **Final Summary & Transcript Always Generated**: `final_summary.md` and `final_transcript.txt`/`.json` are now always produced at session end, even on abrupt stop.
+- ✅ **Batch Summarization**: Summaries are now generated in batches (see `--summary-batch-size`), with a true final summary synthesized from all batch summaries.
+- ✅ **Token Metrics**: Metrics files now include approximate token counts for each transcript, batch, and final summary.
 - ✅ **Race Condition Fix**: Enhanced file stability checking with audio duration verification prevents processing incomplete segments
 - ✅ **Server Backend**: Full HTTP API integration with Whisper.cpp server for distributed processing  
 - ✅ **Truncation Retry**: Automatic retry mechanism for server responses with early truncation
@@ -16,6 +19,9 @@ UPDATED (2025-08-10): The processing pipeline now uses decoupled queues with ind
 - Server backend retry logic: handles inconsistent response formats and truncation
 - Enhanced file stability checks with audio duration validation
 - Decoupled pipeline stages: separate transcription and summarization queues/workers
+- **Batch Summarization**: Use `--summary-batch-size N` to concatenate N segment transcripts for each summarization batch. Batch summaries are written as `batch_XXX_summary.md`. Any leftover segments are summarized at the end. The final summary is synthesized from all batch summaries.
+- **Final Summary & Transcript**: At session end, a true final summary (`final_summary.md`) and aggregate transcript (`final_transcript.txt`/`.json`) are always generated, even if the session is stopped abruptly.
+- **Token Metrics**: Metrics files now include approximate token counts (chars/4) for each transcript, batch, and final summary.
 
 Removed / Changed:
 - Removed `--format` (WAV is mandatory for Whisper.cpp performance).
@@ -28,11 +34,10 @@ Removed / Changed:
 - Enhanced: Server backend with retry mechanism for robust distributed processing.
 
 Still Pending (Roadmap):
-- Aggregate full transcript file (`full_transcript.txt/.json`).
 - Segment cleanup / retention policies.
 - Encryption options.
 - Custom initial/continuation prompt wiring (flags reserved).
-- Final aggregate summary improvements beyond copy of rolling summary.
+- Enhanced final summary (structured sections, decisions, action items).
 
 ## Features
 
@@ -62,6 +67,8 @@ Still Pending (Roadmap):
   - Server backend handles response format variations and automatic retry on truncation
   - Race condition protection prevents processing incomplete segments
 - **Config + CLI**: YAML config + arguments.
+- **Batch Summarization**: Use `--summary-batch-size N` to concatenate N segment transcripts for each summarization batch. Batch summaries are written as `batch_XXX_summary.md`. Any leftover segments are summarized at the end. The final summary is synthesized from all batch summaries.
+- **Token Metrics**: Metrics files now include approximate token counts (chars/4) for each transcript, batch, and final summary.
 
 ## Installation
 
@@ -157,6 +164,7 @@ python meeting_recorder.py --start --enable-automation --system-only \
 - `--ollama-system-prompt`: System (persona/context) prompt
 - `--ollama-prompt-initial`: (Reserved) Custom initial summary prompt (not yet wired)
 - `--ollama-prompt-continuation`: (Reserved) Custom continuation summary prompt (not yet wired)
+- `--summary-batch-size N`  Number of transcription segments to concatenate for each summarization batch (default: 1, i.e., per-segment)
 
 (Deprecated/Removed: `--format`, `--bitrate`)
 
@@ -199,7 +207,7 @@ When `--enable-automation`:
 2. Transcription worker enqueues/transcribes via Whisper backend → JSON + TXT into `transcription/` (TX queue)
 3. Summarization worker consumes transcripts → per-segment summary + rolling summary in `summaries/` (SUM queue)
 4. Workers are independent; transcription does not wait for summarization.
-5. On session stop: pipeline drains both queues; `final_summary.md` created from `rolling_summary.md`.
+5. On session stop: pipeline drains both queues; **a true `final_summary.md` and `final_transcript.txt`/`.json` are always generated from all batch summaries and transcripts, even if the session is stopped abruptly.**
 
 ### Ollama Summarization
 - First segment: Introductory summarization prompt.
@@ -210,12 +218,10 @@ When `--enable-automation`:
 Currently not applied automatically in the new hierarchy; manual per-file processing (if re-introduced) would operate on `segments/` WAV files.
 
 ## Limitations / Known Gaps
-- No aggregate full transcript (`full_transcript.txt/json`).
 - No cleanup or retention policies yet.
 - No encryption.
 - Prompt customization flags not yet wired into summarization logic.
-- `final_summary.md` is currently identical to last rolling summary state.
-- Metrics currently segment-level only (no batch accumulation yet).
+- Enhanced final summary structure (sections, action items) still planned.
 
 ## Fixed Issue: Whisper.cpp early output/truncation on longer segments (RESOLVED)
 
@@ -259,7 +265,6 @@ The fix has been thoroughly tested with:
 | Truncated transcript (early/short) | Context WAV built short or decode stopped early | Disable pre-roll/pad; try `pywhispercpp`; reduce segment duration; await guard fix |
 
 ## Roadmap (Planned Enhancements)
-- Full session aggregate transcript file(s).
 - Segment cleanup / retention policies.
 - Encryption of outputs.
 - Configurable prompt templates (initial / continuation).

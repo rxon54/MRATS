@@ -3,7 +3,7 @@
 <!-- Implementation Status Addendum (2025-08-08) -->
 **Implementation Status Addendum (2025-08-08)**  
 The live codebase now implements the structured directory hierarchy and WAV-only recording:
-- Implemented: Segmented recording (ffmpeg), per-segment metadata JSON, Whisper.cpp transcription (JSON + TXT), Ollama rolling summarization, background processing queue, file stability checks, CLI + YAML config, basic retry logic, rolling summary file, hierarchical output directories (`segments/`, `transcription/`, `summaries/`), session-level `metadata.json`, generation of `final_summary.md` (copy of rolling summary on stop).
+- Implemented: Segmented recording (ffmpeg), per-segment metadata JSON, Whisper.cpp transcription (JSON + TXT), Ollama rolling summarization, background processing queue, file stability checks, CLI + YAML config, basic retry logic, rolling summary file, hierarchical output directories (`segments/`, `transcription/`, `summaries/`), session-level `metadata.json`, generation of `final_summary.md` (true synthesis from batch summaries), batch summarization (`--summary-batch-size`), and token metrics in NDJSON.
 - Partially Implemented / Different from Spec:
   - Final consolidated transcript not yet produced (`full_transcript.txt/json` pending); `final_summary.md` is a direct copy of the last rolling summary (no additional synthesis step yet).
   - No cleanup (`--cleanup-segments`), encryption, batch-processing modes, or health-check routines yet.
@@ -160,8 +160,9 @@ This document outlines the requirements for extending the existing Meeting Recor
 #### 3.5.2 Summary Output
 - **REQ-014**: System SHALL generate progressive summary files **[COMPLETED]**
   - **Incremental Summaries**: Individual segment summaries
+  - **Batch Summaries**: Concatenated segment transcripts summarized as `batch_XXX_summary.md` (see `--summary-batch-size`)
   - **Rolling Summary**: Continuously updated meeting summary
-  - **Final Summary**: Comprehensive end-of-meeting summary
+  - **Final Summary**: Comprehensive end-of-meeting summary synthesized from all batch summaries
   - **Format**: Markdown with structured sections
 
 #### 3.5.3 File Organization
@@ -649,3 +650,4 @@ Outputs:
 - **REQ-034**: System SHALL record benchmark metrics per segment: transcription wall time, summarization wall time, queue wait time, total latency. [Implemented partial]
 - **REQ-035**: System SHALL emit warnings when (a) transcription backlog exceeds configurable `--max-transcription-backlog`, (b) average processing latency exceeds 2× segment duration, (c) summarization backlog exceeds `--max-summary-backlog`. [Planned]
 - **REQ-040a**: System SHALL decouple transcription and summarization using independent queues and workers so that transcription never blocks waiting for summarization. [Implemented]
+- **REQ-041**: System SHALL record char and token counts for transcripts, batches, and summaries in metrics output **[COMPLETED]**
